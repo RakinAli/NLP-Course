@@ -68,37 +68,51 @@ class CKY:
     # parse table, and all the backpointers in the table
     #       """Produces a CKY parse table from the input sentence s."""
     """https://coli-saar.github.io/cl19/lectures/07-cky.pdf"""
-
+    """https://www.inf.ed.ac.uk/teaching/courses/fnlp/lectures/12_slides-2x2.pdf"""
 
     def parse(self, s):
         self.words = s.split()
-        length = len(self.words)
+        print("Words:", self.words)
+        print("Unary rules:", self.unary_rules)
+        print("Binary rules:", self.binary_rules)
+    
 
-        # Initialize the table with empty lists, adjusted to not include the first empty column
-        self.table = [[[] for _ in range(length)] for _ in range(length)]
-        self.backptr = [[[] for _ in range(length)] for _ in range(length)]
+        # Init the table and backptr as 2 dimensional arrays
+        for _ in range(len(self.words)):
+            self.table.append([[] for _ in range(len(self.words))])
+            self.backptr.append([{} for _ in range(len(self.words))])
 
-        # Fill the diagonal (i, i) cells of the table using unary rules for single words
-        for i, word in enumerate(self.words):
-            if word in self.unary_rules:
-                for rule in self.unary_rules[word]:
-                    self.table[i][i].append(
-                        rule
-                    )  # Note the change here from i][i + 1] to i][i]
+        # fill the diagonal
+        for i in range(len(self.words)):
+            self.table[i][i] = self.unary_rules[self.words[i]]
 
-        # Fill in the table for spans larger than 1
-        for span in range(2, length + 1):
-            for start in range(length - span + 1):
-                end = start + span - 1  # Adjusted to work with the updated table dimensions
-                for mid in range(start, end):  # Note: mid goes from start to end - 1
-                    for A in self.table[start][mid]:
-                        for B in self.table[mid + 1][end]:
-                            if A in self.binary_rules and B in self.binary_rules[A]:
-                                for C in self.binary_rules[A][B]:
-                                    if C not in self.table[start][end]:
-                                        self.table[start][end].append(C)
-                                        self.backptr[start][end].append((mid, A, B))
-        # Prints the parse table
+        # fill the rest of the table. Left to right
+        for end in range(1, len(self.words)):
+            for start in range(end - 1, -1, -1):
+                possibilities = []
+                # Bottom to top however diagonally from left to right
+                for k in range(start, end):
+                    left = self.table[start][k]
+                    right = self.table[k + 1][end]
+                    if left != [] and right != []:
+                        combination = [[l, r] for l in left for r in right]
+                        for c in combination:
+                            try:
+                                result = self.binary_rules[c[0]][c[1]][0]
+                                possibilities.append(result)
+                                # If the result is not in the backpointer, add it
+                                if result not in self.backptr[start][end]:
+                                    self.backptr[start][end][result] = [
+                                        [start, k, c[0], k + 1, end, c[1]]
+                                    ]
+                                else:
+                                    self.backptr[start][end][result].append(
+                                        [start, k, c[0], k + 1, end, c[1]]
+                                    )
+                            except:
+                                continue
+                self.table[start][end] = possibilities
+
     def print_table(self):
         t = AsciiTable(self.table)
         t.inner_heading_row_border = False
