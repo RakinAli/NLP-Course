@@ -65,7 +65,7 @@ class CKY:
 
     # Parses the sentence a and computes all the cells in the
     # parse table, and all the backpointers in the table
-    
+    # https://courses.engr.illinois.edu/cs447/fa2018/Slides/Lecture09.pdf
     def parse(self, s):
         self.words = s.split()
 
@@ -82,28 +82,28 @@ class CKY:
         for end in range(1, len(self.words)):
             for start in range(end - 1, -1, -1):
                 possibilities = []
-                for k in range(start, end):
-                    left = self.table[start][k]
-                    right = self.table[k + 1][end]
+                for midpoint in range(start, end):
+                    left = self.table[start][midpoint]
+                    right = self.table[midpoint + 1][end]
+                    # For each combination of left and right symbols
                     if left and right:
                         combination = [[l, r] for l in left for r in right]
-                        # print(left, "+", right, "-->", combination)
                         for c in combination:
                             try:
                                 result = self.binary_rules[c[0]][c[1]][0]
                                 possibilities.append(result)
                                 if result not in self.backptr[start][end]:
                                     self.backptr[start][end][result] = [
-                                        [start, k, c[0], k + 1, end, c[1]]
+                                        [start, midpoint, c[0], midpoint + 1, end, c[1]]
                                     ]
                                 else:
                                     self.backptr[start][end][result].append(
-                                        [start, k, c[0], k + 1, end, c[1]]
+                                        [start, midpoint, c[0], midpoint + 1, end, c[1]]
                                     )
                             except:
                                 continue
                 self.table[start][end] = possibilities
-    
+
     # Prints the parse table
     def print_table(self):
         t = AsciiTable(self.table)
@@ -113,39 +113,35 @@ class CKY:
     # Prints all parse trees derivable from cell in row 'row' and
     # column 'column', rooted with the symbol 'symbol'
     def print_trees(self, row, column, symbol):
-        tree = self.rec_print_trees(row, column, symbol)
+        tree = self.tree_builder(row, column, symbol)
         print(tree)
 
-    def rec_print_trees(self, row, column, symbol):
+    # Builds the tree resursively
+    def tree_builder(self, row, column, symbol):
+        # Base case --> if the cell is a leaf
         if row == column:
             return symbol + "(" + self.words[row] + ")"
 
+        # Recursive case --> if the cell is not a leaf then build the tree recursively
         tree = ""
         prev_combinations = self.backptr[column][row][symbol]
-        for prev_c in prev_combinations:
-            left_tree = self.rec_print_trees(prev_c[1], prev_c[0], prev_c[2])
-            right_tree = self.rec_print_trees(prev_c[4], prev_c[3], prev_c[5])
+        for prev_combo in prev_combinations:
+            left_tree = self.tree_builder(prev_combo[1], prev_combo[0], prev_combo[2])
+            right_tree = self.tree_builder(prev_combo[4], prev_combo[3], prev_combo[5])
+            # Check if the left and right trees are not leaf nodes
             if "\n" not in left_tree and "\n" not in right_tree:
                 tree += symbol + "(" + left_tree + ", " + right_tree + ")"
                 if len(prev_combinations) > 1:
                     tree += "\n"
             else:
                 left_tree_list = left_tree.split("\n")
-                for lt in left_tree_list:
+                for left_side in left_tree_list:
                     right_tree_list = right_tree.split("\n")
-                    for rt in right_tree_list:
-                        if lt != "" and rt != "":
-                            tree += symbol + "(" + lt + ", " + rt + ")\n"
-
-        # check redundancy
-        trees = set(tree.split("\n"))
-        tree = ""
-        for t in trees:
-            if t != "":
-                tree += t + "\n"
+                    for right_side in right_tree_list:
+                        if left_side != "" and right_side != "":
+                            tree += symbol + "(" + left_side + ", " + right_side + ")\n"
 
         return tree
-
 
 def main():
     # Parse command line arguments
