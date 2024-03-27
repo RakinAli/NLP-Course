@@ -5,7 +5,7 @@ import argparse
 The CKY parsing algorithm.
 
 This file is part of the computer assignments for the course DD2418 Language engineering at KTH.
-Created 2019 by Johan Boye.
+Created 2019 by Johan Boye. Modified 2024 by me 
 """
 
 
@@ -66,43 +66,39 @@ class CKY:
 
     # Parses the sentence a and computes all the cells in the
     # parse table, and all the backpointers in the table
+    #       """Produces a CKY parse table from the input sentence s."""
+    """https://coli-saar.github.io/cl19/lectures/07-cky.pdf"""
+
+
     def parse(self, s):
-        """Produces a CKY parse table from the input sentence s."""
-        """https://coli-saar.github.io/cl19/lectures/07-cky.pdf"""
         self.words = s.split()
         length = len(self.words)
 
-        # Initialize the table with empty lists
-        self.table = [[[] for _ in range(length + 1)] for _ in range(length)]
-        self.backptr = [[[] for _ in range(length + 1)] for _ in range(length)]
+        # Initialize the table with empty lists, adjusted to not include the first empty column
+        self.table = [[[] for _ in range(length)] for _ in range(length)]
+        self.backptr = [[[] for _ in range(length)] for _ in range(length)]
 
-        # Fill the diagonal of the table using unary rules --> Base case
+        # Fill the diagonal (i, i) cells of the table using unary rules for single words
         for i, word in enumerate(self.words):
             if word in self.unary_rules:
-                self.table[i][i + 1] = self.unary_rules[word]
+                for rule in self.unary_rules[word]:
+                    self.table[i][i].append(
+                        rule
+                    )  # Note the change here from i][i + 1] to i][i]
 
-        # Fill in the table for phrases and sentences
-        # Span size --> N 
-        for span in range(2, length + 1):   
-            # Start at second leftmost cell and move right
-            # N size
+        # Fill in the table for spans larger than 1
+        for span in range(2, length + 1):
             for start in range(length - span + 1):
-                end = start + span
-                # At most N size thus n^3
-                for mid in range(start + 1, end):
-                    # Check the combination of all entries in the left and right spans
+                end = start + span - 1  # Adjusted to work with the updated table dimensions
+                for mid in range(start, end):  # Note: mid goes from start to end - 1
                     for A in self.table[start][mid]:
-                        for B in self.table[mid][end]:
-                            if A in self.binary_rules:
-                                if B in self.binary_rules[A]:
-                                    # We have found a binary rule A -> B C
-                                    C = self.binary_rules[A][B]
-                                    self.table[start][end].extend(C)
-                                    # Add backpointers
-                                    for c in C:
+                        for B in self.table[mid + 1][end]:
+                            if A in self.binary_rules and B in self.binary_rules[A]:
+                                for C in self.binary_rules[A][B]:
+                                    if C not in self.table[start][end]:
+                                        self.table[start][end].append(C)
                                         self.backptr[start][end].append((mid, A, B))
-
-    # Prints the parse table
+        # Prints the parse table
     def print_table(self):
         t = AsciiTable(self.table)
         t.inner_heading_row_border = False
@@ -110,38 +106,39 @@ class CKY:
 
     # Prints all parse trees derivable from cell in row 'row' and
     # column 'column', rooted with the symbol 'symbol'
-    def print_trees(self, row, column, symbol, top=True):
-        print("DEBUGGER___________________________")
-        # Print out the unary rules
-        print("Unary rules: ", self.unary_rules)
-        print("Binary rules: ", self.binary_rules)
-        print("Table: ", self.table)
-        print("Backpointers: ", self.backptr)
-        print("Words: ", self.words)
-        print("__________________________________")
-        # Terminal case
-        if row == column - 1:
+
+    def print_trees(self, row, column, symbol, prefix=""):
+        # Base case: if we are at a leaf node in the parse tree (only unary rules).
+        if row == column:  
+            # Check if the symbol matches any of the unary rules for the word at this position.
             if symbol in self.unary_rules and self.words[row] in self.unary_rules[symbol]:
-                print(f'{symbol}({self.words[row]})', end='')
+                print(f"{prefix}{symbol} -> '{self.words[row]}'")
             return
 
-        # Non-terminal case
+        # If the symbol is not in the current cell, there is no parse tree starting with this symbol here.
         if symbol not in self.table[row][column]:
-            if top:
-                print(f"No parse tree for symbol {symbol} at position {row}, {column}")
             return
 
-        for sym, pair, k in self.backptr[row][column]:
-            if sym == symbol:  # one of our guys
-                if top:
-                    print(f'{sym} ->', end=' ')
-                print(f'(', end='')
-                self.print_trees(row, k, pair[0], False)
-                print(', ', end='')
-                self.print_trees(k, column, pair[1], False)
-                print(')', end='')
-                if top:
-                    print('')
+        # Check each backpointer entry to see if it can produce the required symbol.
+        for mid, left_symbol, right_symbol in self.backptr[row][column]:
+            # Only print the rules if the current backpointer's left and right symbols correspond to the current cell.
+            if left_symbol in self.binary_rules and right_symbol in self.binary_rules[left_symbol]:
+                if symbol in self.binary_rules[left_symbol][right_symbol]:
+                    # Print the current production rule.
+                    print(f"{prefix}{symbol} -> {left_symbol} {right_symbol}")
+                    # Recursively print the parse trees for the left and right parts of the rule.
+                    self.print_trees(row, mid, left_symbol, prefix + "  ")
+                    self.print_trees(mid + 1, column, right_symbol, prefix + "  ")
+
+        # Additionally, handle the case where a unary rule may apply to a non-terminal.
+        if symbol in self.unary_rules:
+            for unary_producer in self.unary_rules[symbol]:
+                # This checks if a unary rule can be applied to any of the symbols in the current cell.
+                if unary_producer in self.table[row][column]:
+                    print(f"{prefix}{symbol} -> {unary_producer}")
+                    self.print_trees(row, column, unary_producer, prefix + "  ")
+
+
 def main():
 
     # Parse command line arguments
@@ -173,7 +170,7 @@ def main():
     if arguments.print_parsetable:
         cky.print_table()
     if arguments.print_trees:
-        cky.print_trees(len(cky.words) - 1, 0, arguments.symbol)
+        cky.print_trees(0, len(cky.words) - 1, arguments.symbol)
 
 
 if __name__ == "__main__":
