@@ -68,17 +68,16 @@ class CKY:
     # https://courses.engr.illinois.edu/cs447/fa2018/Slides/Lecture09.pdf
     def parse(self, s):
         self.words = s.split()
-        # Print umary rules
-        #print("Unary rules: ", self.unary_rules)
-        #print("Binary rules: ", self.binary_rules)
 
         # initialise the table
         for _ in range(len(self.words)):
             self.table.append([[] for _ in range(len(self.words))])
             self.backptr.append([{} for _ in range(len(self.words))])
 
+        print("Unary rules: ", self.unary_rules)
         # fill the diagonal
         for i in range(len(self.words)):
+
             self.table[i][i] = self.unary_rules[self.words[i]]
 
         # fill the rest of the table from down to up
