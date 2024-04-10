@@ -1,0 +1,3 @@
+
+c:\GitHub\LanguageEngineering\LangEngSolutions\a02>python BigramTester.py -f guardian_model.txt -t data/guardian_test.txt 
+Read 871878 words. Estimated entropy: 6.62
