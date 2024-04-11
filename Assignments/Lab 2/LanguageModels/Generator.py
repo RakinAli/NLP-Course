@@ -61,6 +61,7 @@ class Generator(object) :
         :return: <code>true</code> if the entire file could be processed, false otherwise.
         """
 
+        # Your code here
         try:
             with codecs.open(filename, 'r', 'utf-8') as f:
                 # Reads the first line, extracts
@@ -93,12 +94,12 @@ class Generator(object) :
         Generates and prints n words, starting with the word w, and sampling from the distribution
         of the language model.
         """ 
-
+        # Your code here  
         grab_key = self.index[w]
         sentence = []
         
         sentence.append(w)
-        
+
         for _ in range(n):
             word_combo = []
             word_prob = []
