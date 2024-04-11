@@ -24,7 +24,6 @@ class BinaryLogisticRegression(object):
 
     # ----------------------------------------------------------------------
 
-
     def __init__(self, x=None, y=None, theta=None):
         """
         Constructor. Imports the data and labels needed to build theta.
@@ -59,10 +58,7 @@ class BinaryLogisticRegression(object):
             # The current gradient.
             self.gradient = np.zeros(self.FEATURES)
 
-
-
     # ----------------------------------------------------------------------
-
 
     def sigmoid(self, z):
         """
@@ -70,34 +66,37 @@ class BinaryLogisticRegression(object):
         """
         return 1.0 / ( 1 + np.exp(-z) )
 
-
     def conditional_prob(self, label, datapoint):
         """
         Computes the conditional probability P(label|datapoint)
         """
 
         # REPLACE THE COMMAND BELOW WITH YOUR CODE
-
-        return 0
-
+        z = np.dot(self.theta, self.x[datapoint].T)
+        prob = self.sigmoid(z)
+        if label == 1:
+            return prob
+        else:
+            return 1 - prob
 
     def compute_gradient_for_all(self):
         """
         Computes the gradient based on the entire dataset
         (used for batch gradient descent).
         """
+        loss = self.sigmoid(np.dot(self.theta, self.x.T)) - self.y
 
-        # YOUR CODE HERE
-
+        # Update the gradient
+        for feature in range(self.FEATURES):
+            self.gradient[feature] = self.x.T[feature].dot(loss.T) / self.DATAPOINTS
 
     def compute_gradient_minibatch(self, minibatch):
         """
         Computes the gradient based on a minibatch
         (used for minibatch gradient descent).
         """
-        
-        # YOUR CODE HERE
 
+        # YOUR CODE HERE
 
     def compute_gradient(self, datapoint):
         """
@@ -107,7 +106,6 @@ class BinaryLogisticRegression(object):
 
         # YOUR CODE HERE
 
-
     def stochastic_fit(self):
         """
         Performs Stochastic Gradient Descent.
@@ -115,7 +113,6 @@ class BinaryLogisticRegression(object):
         self.init_plot(self.FEATURES)
 
         # YOUR CODE HERE
-
 
     def minibatch_fit(self):
         """
@@ -128,18 +125,45 @@ class BinaryLogisticRegression(object):
 
     def fit(self):
         """
-        Performs Batch Gradient Descent
+        Performs Batch Gradient Descent to optimize the theta parameters of the logistic regression model.
         """
+        # Initialize plotting for visualization
         self.init_plot(self.FEATURES)
 
-        # YOUR CODE HERE
+        # Tracking the number of iterations
+        itr = 0
 
+        # Main optimization loop
+        while True:
+            itr += 1  # Increment iteration counter
+
+            # Compute the gradient using the entire dataset
+            self.compute_gradient_for_all()
+
+            # Update model parameters (theta) using the gradient
+            for k in range(self.FEATURES):
+                self.theta[k] -= self.LEARNING_RATE * self.gradient[k]
+
+            # Output the progress every 10 iterations and the first iteration
+            if itr == 1 or itr % 10 == 0:
+                gradient_norm = np.sum(np.square(self.gradient))
+                print(f"Iter: {itr}, Sum of square of Gradient: {gradient_norm:.6f}")
+                self.update_plot(gradient_norm)
+
+            # Check for convergence and terminate if the gradient is sufficiently small
+            if gradient_norm < self.CONVERGENCE_MARGIN:
+                print(
+                    f"At termination, Iter: {itr}, Sum of Square of Gradient: {gradient_norm:.6f}"
+                )
+                break
+
+            pass
 
     def classify_datapoints(self, test_data, test_labels):
         """
         Classifies datapoints
         """
-        print('Model parameters:');
+        print('Model parameters:')
 
         print('  '.join('{:d}: {:.4f}'.format(k, self.theta[k]) for k in range(self.FEATURES)))
 
@@ -164,11 +188,9 @@ class BinaryLogisticRegression(object):
                 print('                 {:2d} '.format(i), end='')
             print(' '.join('{:>8.3f}'.format(confusion[i][j]) for j in range(2)))
 
-
     def print_result(self):
         print(' '.join(['{:.2f}'.format(x) for x in self.theta]))
         print(' '.join(['{:.2f}'.format(x) for x in self.gradient]))
-
 
     # ----------------------------------------------------------------------
 
@@ -191,7 +213,6 @@ class BinaryLogisticRegression(object):
 
         plt.draw()
         plt.pause(1e-20)
-
 
     def init_plot(self, num_axes):
         """
