@@ -77,6 +77,8 @@ class LogisticRegression(object):
         #
         # YOUR CODE HERE
         #
+
+
         return [], [], [], []
 
 
@@ -87,6 +89,8 @@ class LogisticRegression(object):
         #
         # YOUR CODE HERE
         #
+
+        
         return -1
 
 
