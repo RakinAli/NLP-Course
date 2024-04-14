@@ -96,23 +96,63 @@ class BinaryLogisticRegression(object):
         (used for minibatch gradient descent).
         """
 
-        # YOUR CODE HERE
+        # Grab the y values for the minibatch
+        y_minibatch = self.y[minibatch]
+        x_minibatch = self.x[minibatch]
+
+        # Compute the loss for the minibatch
+        loss = self.sigmoid(np.dot(self.theta, x_minibatch.T)) - y_minibatch
+
+        # Update the gradient for the minibatch
+        for feature in range(self.FEATURES):
+            self.gradient[feature] = x_minibatch.T[feature].dot(loss.T) / self.MINIBATCH_SIZE
+
 
     def compute_gradient(self, datapoint):
         """
         Computes the gradient based on a single datapoint
         (used for stochastic gradient descent).
         """
-
         # YOUR CODE HERE
+        loss = self.sigmoid(self.theta.dot(self.x[datapoint].T)) - self.y[datapoint]
+
+        # Update the gradient for the current datapoint
+        for feature in range(self.FEATURES):
+            self.gradient[feature] = self.x[datapoint][feature] * loss
 
     def stochastic_fit(self):
         """
         Performs Stochastic Gradient Descent.
         """
         self.init_plot(self.FEATURES)
-
         # YOUR CODE HERE
+        gradient_norm = np.inf
+        iteration = 0
+
+        while gradient_norm > self.CONVERGENCE_MARGIN:
+            iteration += 1
+            
+            # Get random datapoint and compute gradient
+            datapoint = random.randint(0, self.DATAPOINTS)
+            self.compute_gradient(datapoint)
+
+            for k in range(self.FEATURES):
+                self.theta[k] -= self.LEARNING_RATE * self.gradient[k]
+
+            # Plotting the progress
+            gradient_norm = np.sum(np.square(self.gradient))
+            if iteration == 1 or iteration % 50 == 0:
+                print(f"Iter: {iteration}, Sum of square of Gradient: {gradient_norm:.6f}")
+                self.update_plot(gradient_norm)
+
+            # Terminating condition
+            if np.sum(np.square(self.gradient)) < self.CONVERGENCE_MARGIN:
+                print(
+                    f"At termination, Iter: {iteration}, Sum of Square of Gradient: {gradient_norm:.6f}"
+                )
+                break
+        
+
 
     def minibatch_fit(self):
         """
@@ -121,7 +161,32 @@ class BinaryLogisticRegression(object):
         self.init_plot(self.FEATURES)
 
         # YOUR CODE HERE
+        gradient_norm = np.inf
+        iteration = 0
 
+        while gradient_norm > self.CONVERGENCE_MARGIN:
+            iteration += 1
+
+            # Pick MINIBATCH_SIZE random datapoints and compute gradient
+            minibatch = random.sample(range(self.DATAPOINTS), self.MINIBATCH_SIZE)
+            self.compute_gradient_minibatch(minibatch)
+
+            for k in range(self.FEATURES):
+                self.theta[k] -= self.LEARNING_RATE * self.gradient[k]
+
+            # Plotting the progress
+            gradient_norm = np.sum(np.square(self.gradient))
+            if iteration == 1 or iteration % 50 == 0:
+                print(f"Iter: {iteration}, Sum of square of Gradient: {gradient_norm:.6f}")
+                self.update_plot(gradient_norm)
+
+            # Terminating condition
+            if np.sum(np.square(self.gradient)) < self.CONVERGENCE_MARGIN:
+                print(
+                    f"At termination, Iter: {iteration}, Sum of Square of Gradient: {gradient_norm:.6f}"
+                )
+                break
+            
 
     def fit(self):
         """
@@ -133,8 +198,10 @@ class BinaryLogisticRegression(object):
         # Tracking the number of iterations
         itr = 0
 
+        gradient_norm = np.inf
+
         # Main optimization loop
-        while True:
+        while gradient_norm>self.CONVERGENCE_MARGIN:
             itr += 1  # Increment iteration counter
 
             # Compute the gradient using the entire dataset
@@ -145,7 +212,7 @@ class BinaryLogisticRegression(object):
                 self.theta[k] -= self.LEARNING_RATE * self.gradient[k]
 
             # Output the progress every 10 iterations and the first iteration
-            if itr == 1 or itr % 10 == 0:
+            if itr == 1 or itr % 50 == 0:
                 gradient_norm = np.sum(np.square(self.gradient))
                 print(f"Iter: {itr}, Sum of square of Gradient: {gradient_norm:.6f}")
                 self.update_plot(gradient_norm)

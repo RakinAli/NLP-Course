@@ -1,0 +1,16 @@
+For Minibatch:
+
+True Positive = 13273
+False Positives = 2015
+False Negatives = 4036
+
+
+Precision = TP / (TP + FP) = 13273 / (13273 + 2015) = 0.868
+
+Recall = TP / (TP + FN) = 13273 / (13273 + 4036) = 0.767
+
+F1 Score = 2 * (Precision * Recall) / (Precision + Recall) = 2 * (0.868 * 0.767) / (0.868 + 0.767) = 0.814
+
+Since I have a convergence margin of 0.01, I will stop the training when the F1 score is greater than 0.814. This is why all of my models have the exact same answer.
+
+
