@@ -138,7 +138,7 @@ def main():
         arguments = argparse.Namespace()
         arguments.file = 'kafka_model.txt'
         arguments.start = "gregor"
-        arguments.number_of_words = 10
+        arguments.number_of_words = 50
 
         generator = Generator()
         generator.read_model(arguments.file)

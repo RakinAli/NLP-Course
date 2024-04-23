@@ -2,12 +2,13 @@ import time
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-
+import math 
 
 """
 This file is part of the computer assignments for the course DD2418 Language engineering at KTH.
 Created 2019 by Dmytro Kalpakchi.
 """
+
 class LogisticRegression(object):
     """
     This class performs logistic regression using batch gradient descent
@@ -27,13 +28,18 @@ class LogisticRegression(object):
             self.theta = theta
 
         #  ------------- Hyperparameters ------------------ #
-        self.LEARNING_RATE = 0.1            # The learning rate.
+        self.LEARNING_RATE = 0.02            # The learning rate.
         self.MINIBATCH_SIZE = 256           # Minibatch size
         self.PATIENCE = 5                   # A max number of consequent epochs with monotonously
                                             # increasing validation loss for declaring overfitting
         # ---------------------------------------------------------------------- 
 
-
+    def sigmoid(self, z):
+        """
+        The sigmoid function.
+        """
+        return 1 / (1 + np.exp(-z))
+    
     def init_params(self, x, y):
         """
         Initializes the trainable parameters of the model and dataset-specific variables
@@ -76,42 +82,107 @@ class LogisticRegression(object):
         """
         #
         # YOUR CODE HERE
-        #
+        
 
+        train_size = int(ratio * len(x))
 
-        return [], [], [], []
+        # Shuffle the data
+        indices = np.arange(x.shape[0])
+        np.random.shuffle(indices)
+
+        x = x[indices]
+        y = y[indices]
+
+        # Split the data
+        x_train = x[:train_size]
+        y_train = y[:train_size]
+        x_val = x[train_size:]
+        y_val = y[train_size:]
+
+        return x_train, y_train, x_val, y_val
+
 
 
     def loss(self, x, y):
         """
-        Calculates the loss for the datapoints present in `x` given the labels `y`.
-        """
-        #
-        # YOUR CODE HERE
-        #
+        Calculates the loss for the datapoints present in `x` given the labels `y`
+        Lecture 5 slide 59 has the formula.
 
-        
-        return -1
+        Loss(x[i],y[i]) = -log(P(y[i] = k|x[i]))
+
+        that is:
+        Loss(x,y) = -log(softmax(theta * xi)_k) if y = k
+        if y != k, then Loss(x,y) = 0
+
+        Total loss is obtained by summing the loss for all datapoints
+        """
+        # Your code here
+
+        loss = 0
+
+        # One hot label for y 
+        y_one_hot = np.zeros((len(y), self.CLASSES))
+
+        for i in range(self.CLASSES):
+            y_one_hot[y == i, i] = 1 
+
+        x_theta = np.dot(x, self.theta)
+        sigmoid_x_theta = self.sigmoid(x_theta)
+
+        # Loss function when y = k
+        loss_k = y_one_hot * np.log(sigmoid_x_theta)
+
+        # Loss function when y != k
+        loss_not_k = (1 - y_one_hot) * np.log(1 - sigmoid_x_theta)
+
+        # Loss for one datapoint
+        loss = -np.sum(loss_k + loss_not_k) 
+
+        # Cross entropy loss
+        return loss / len(y)
+    
 
 
     def conditional_log_prob(self, label, datapoint):
         """
-        Computes the conditional log-probability log[P(label|datapoint)]
+        Computes the conditional log-probability log[P(label|datapoint)]. Lecture 5 slide 11 has the formula.
         """
-        #
         # YOUR CODE HERE
-        #
-        return -1
+        """
+        Suppose we have a set of numbers z1 to zn. The softmax function normalizes those numbers into a probability distribution
 
+        We then estimate P(y = k | x) = softmax(theta * x)_k
+
+        eg: P(Y=2 | x) = softmax(theta * x)_2 = exp(theta_2 * x) / sum_{j=1}^{3} exp(theta_j * x)
+        """
+
+        datapoint_theta = np.dot(datapoint, self.theta)
+
+        marginal = sum([math.exp(datapoint_theta[j]) for j in range(self.CLASSES)])
+
+        return math.exp(datapoint_theta[label]) / marginal
 
     def compute_gradient(self, minibatch):
         """
         Computes the gradient based on a mini-batch
         """
-        #
         # YOUR CODE HERE
-        #
-        pass
+
+        miniX, miniY = self.x[minibatch] , self.y[minibatch]
+
+        # One-hot label for minibatchY
+        one_hot_miniY =  np.zeros((miniY.shape[0], self.CLASSES))
+        for i in range(self.CLASSES):
+            one_hot_miniY[:, i] = np.where(miniY[:] == i, 1, 0)
+
+        # np.vectorize can be used so that we can use our sigmoid function on vectors
+
+        # Apply sigmoid function to the result of miniX * theta and deduct one_hot_miniY 
+        diff = self.sigmoid(miniX.dot(self.theta)) - one_hot_miniY
+
+        # Update the gradient for each feature based on the mini dataset
+        for k in range(self.CLASSES):
+            self.gradient[k] = miniX.T.dot(diff)[k] / len(minibatch)
 
 
     def fit(self, x, y):
@@ -127,11 +198,46 @@ class LogisticRegression(object):
 
         start = time.time()
         
-        #
         # YOUR CODE HERE
-        #
+        
+        # Initialise iteration to 0. Will be used for tracking
+        itr = 0
+        patient_count = 0
+        prevLoss = 100
+        while True:
+            itr += 1
 
+            datapoints = []
+
+            # Randomly pick MINIBATCH_SIZE datapoints
+            for i in range(self.MINIBATCH_SIZE):
+                random_datapoint = random.randrange(0, self.TRAINING_DATAPOINTS)
+                datapoints.append(random_datapoint)
+
+            self.compute_gradient(datapoints)
+
+            for k in range(self.CLASSES):
+                self.theta[k] -= self.LEARNING_RATE * self.gradient[k]
+
+            # Compute cross entropy loss for the current iteration 
+            curLoss = self.loss(self.xv, self.yv)
+            if (curLoss > prevLoss):
+                patient_count += 1
+            else:
+                patient_count = 0
+
+            # Loss increases monotonously for PATIENCE measurements
+            if (patient_count > self.PATIENCE):
+                break
+            
+            prevLoss = curLoss
+            
+            if itr == 1 or itr % 100 == 0:
+                print("Iter: {} , Cross-entropy Loss: {} ".format(itr,curLoss))
+                self.update_plot(curLoss)
+        
         print(f"Training finished in {time.time() - start} seconds")
+        
 
 
     def get_log_probs(self, x):
@@ -225,9 +331,10 @@ def main():
     """
     Tests the code on a toy example.
     """
+    
     def get_label(dp):
         if dp[0] == 1: return 2
-        elif dp[2] == 1: return 1
+        elif dp[1] == 1: return 1
         else: return 0
 
     from itertools import product
@@ -246,6 +353,6 @@ def main():
     b.classify_datapoints(x[ind][-20:], y[ind][-20:])
 
 
-
 if __name__ == '__main__':
     main()
+

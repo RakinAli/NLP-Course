@@ -14,7 +14,7 @@ This file is part of the computer assignments for the course DD2417 Language Eng
 Created 2017 by Johan Boye and Patrik Jonell. Modified 2024 by Rakin to solve the assignment.
 """
 # Used to print out statements and for debugging
-debugger = False
+debugger = True
 
 """
 ______________________ Vid redo av uppgiften ______________________
@@ -98,6 +98,8 @@ class BigramTrainer(object):
         Creates a list of rows to print of the language model.
         """
         rows_to_print = []
+        # Your code here
+
 
         # The first line
         first_line = str(self.unique_words) + ' ' + str(self.total_words)
@@ -185,8 +187,6 @@ def main():
 
     bigram_trainer = BigramTrainer()
 
-    bigram_trainer.process_files(arguments.file)
-
     if debugger:
         print("Index: ", bigram_trainer.index, "\n")
         print("Word: ", bigram_trainer.word ,"\n")
@@ -195,8 +195,7 @@ def main():
         print("Unique Words: ", bigram_trainer.unique_words, "\n")
         print("Total Words: ", bigram_trainer.total_words, "\n")
 
-
-
+    bigram_trainer.process_files(arguments.file)
 
     stats = bigram_trainer.stats()
     if arguments.destination:

@@ -89,7 +89,6 @@ class BigramTester(object):
             return False
 
     def compute_entropy_cumulatively(self, word):
-        # TODO: Fatta detta bättre 
         """
         -1/N * sum(Log(P(w_i-1, w_i))) where n is the number of tokens in the test corpus
 
