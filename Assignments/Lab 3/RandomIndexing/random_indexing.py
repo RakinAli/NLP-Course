@@ -5,6 +5,7 @@ import string
 import numpy as np
 from halo import Halo
 from sklearn.neighbors import NearestNeighbors
+import random 
 
 
 """
@@ -24,7 +25,7 @@ class RandomIndexing(object):
     ## @brief      Object initializer Initializes the Random Indexing algorithm
     ##             with the necessary hyperparameters and the textfiles that
     ##             will serve as corpora for generating word vectors
-    ##             
+    ##
     ## The `self.__vocab` instance variable is initialized as a Python's set. If you're unfamiliar with sets, please
     ## follow this link to find out more: https://docs.python.org/3/tutorial/datastructures.html#sets.
     ##
@@ -60,7 +61,6 @@ class RandomIndexing(object):
         self.__rws = right_window_size
         self.__cv = None
         self.__rv = None
-        
 
     ##
     ## @brief      A function cleaning the line from punctuation and digits
@@ -74,9 +74,19 @@ class RandomIndexing(object):
     ## @return     A list of words in a cleaned line
     ##
     def clean_line(self, line):
-        # YOUR CODE HERE
-        return []
+        # YOUR CODE HERE - Done
 
+        # Could not find the python library function to remove 
+        punctuation = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
+        digits = "0123456789"
+
+        cleaned_string = ''
+        cleaned_line = []
+        for char in line:
+            if char not in punctuation and char not in digits:
+                cleaned_string += char
+        cleaned_line = cleaned_string.split()
+        return cleaned_line
 
     ##
     ## @brief      A generator function providing one cleaned line at a time
@@ -98,21 +108,19 @@ class RandomIndexing(object):
                 for line in f:
                     yield self.clean_line(line)
 
-
     ##
     ## @brief      Build vocabulary of words from the provided text files.
     ##
     ##             Goes through all the cleaned lines and adds each word of the
     ##             line to a vocabulary stored in a variable `self.__vocab`. The
     ##             words, stored in the vocabulary, should be unique.
-    ##             
+    ##
     ##             **Note**: this function is where the first pass through all files is made
     ##             (using the `text_gen` function)
     ##
     def build_vocabulary(self):
         # YOUR CODE HERE
         self.write_vocabulary()
-
 
     ##
     ## @brief      Get the size of the vocabulary
@@ -123,18 +131,17 @@ class RandomIndexing(object):
     def vocabulary_size(self):
         return len(self.__vocab)
 
-
     ##
     ## @brief      Creates word embeddings using Random Indexing.
-    ## 
+    ##
     ## The function stores the created word embeddings (or so called context vectors) in `self.__cv`.
     ## Random vectors used to create word embeddings are stored in `self.__rv`.
-    ## 
+    ##
     ## Context vectors are created by looping through each cleaned line and updating the context
     ## vectors following the Random Indexing approach, i.e. using the words in the sliding window.
     ## The size of the sliding window is governed by two instance variables `self.__lws` (left window size)
     ## and `self.__rws` (right window size).
-    ## 
+    ##
     ## For instance, let's consider a sentence:
     ##      I really like programming assignments.
     ## Let's assume that the left part of the sliding window has size 1 (`self.__lws` = 1) and the right
@@ -153,13 +160,13 @@ class RandomIndexing(object):
     ## \endverbatim
     ## where "^" denotes the word we're currently at, "l" denotes the words in the left part of the
     ## sliding window and "r" denotes the words in the right part of the sliding window.
-    ## 
+    
     ## Implementation tips:
     ## - make sure to understand how generators work! Refer to the documentation of a `text_gen` function
     ##   for more description.
     ## - the easiest way is to make `self.__cv` and `self.__rv` dictionaries with keys being words (as strings)
     ##   and values being the context vectors.
-    ## 
+
     ## **Note**: this function is where the second pass through all files is made (using the `text_gen` function).
     ##         The first one was done when calling `build_vocabulary` function. This might not the most
     ##         efficient solution from the time perspective, but it's quite efficient from the memory
@@ -167,19 +174,59 @@ class RandomIndexing(object):
     ##         keeping all the cleaned lines in memory as a gigantic list.
     ##
     def create_word_vectors(self):
-        # YOUR CODE HERE
-        pass
+        # Your code here - done
+        self.__rv, self.__cv = {}, {}
+
+        for line in self.text_gen():
+            if len(line) <= 1:
+                continue
+            
+            for current_index in range(len(line)):
+                right_context = self.get_right_window(current_index, line)
+                left_context = self.get_left_window(current_index, line)
+                context_words = right_context + left_context
+                self.update_word_vector(line[current_index], context_words)
+
+        self.__words = list(self.__cv.keys())
+        self.__matrix = list(self.__cv.values())
+    
+    
+    def get_right_window(self, current_index, line):
+        right_limit = min(current_index + self.__rws + 1, len(line))
+        return line[current_index + 1:right_limit]
+
+    def get_left_window(self, current_index, line):
+        left_limit = max(current_index - self.__lws, 0)
+        return line[left_limit:current_index]
+
+    def update_word_vector(self, word, context_words):
+        # If the word is not in the context vector, add it to the context vector
+        if word not in self.__cv:
+            self.__cv[word] = np.zeros(self.__dim)
+        for ctx_word in context_words:
+            # Does it have a corresponding random vector? If not, create one
+            if ctx_word not in self.__rv:
+                # Generate a random non-zero vector and assign it to the context word
+                non_zero_indices = random.sample(range(self.__dim), self.__non_zero)
+                random_vector = np.zeros(self.__dim)
+                for idx in non_zero_indices:
+                    random_vector[idx] = random.choice(self.__non_zero_values)
+                self.__rv[ctx_word] = random_vector
+            # Update the context vector with the random vector
+            self.__cv[word] += self.__rv[ctx_word]
+            
+ 
 
 
     ##
     ## @brief      Function returning k nearest neighbors with distances for each word in `words`
-    ## 
-    ## We suggest using nearest neighbors implementation from scikit-learn 
+    ##
+    ## We suggest using nearest neighbors implementation from scikit-learn
     ## (https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.NearestNeighbors.html). Check
     ## carefully their documentation regarding the parameters passed to the algorithm.
-    ## 
+    ##
     ## To describe how the function operates, imagine you want to find 5 nearest neighbors for the words
-    ## "Harry" and "Potter" using cosine distance (which can be computed as 1 - cosine similarity). 
+    ## "Harry" and "Potter" using cosine distance (which can be computed as 1 - cosine similarity).
     ## For that you would need to call `self.find_nearest(["Harry", "Potter"], k=5, metric='cosine')`.
     ## The output of the function would then be the following list of lists of tuples (LLT)
     ## (all words and distances are just example values):
@@ -198,9 +245,26 @@ class RandomIndexing(object):
     ## @return     A list of list of tuples in the format specified in the function description
     ##
     def find_nearest(self, words, k=5, metric='cosine'):
-        # YOUR CODE HERE
-        return [None]
+        # YOUR CODE HERE - done
+        nearest_words = []
 
+        nn = NearestNeighbors(n_neighbors=k, metric=metric).fit(self.__matrix)
+
+        for word in words:
+            context_vector_word = self.get_word_vector(word)
+            if context_vector_word is None:
+                continue
+            distances, indices = nn.kneighbors([context_vector_word])
+
+            clostest_words = []
+            for i in range(len(indices[0])):
+                index = indices[0][i]
+                distance = distances[0][i]
+                the_word = self.__words[index]
+                clostest_words.append((the_word, distance))
+            nearest_words.append(clostest_words)
+
+        return nearest_words
 
     ##
     ## @brief      Returns a vector for the word obtained after Random Indexing is finished
@@ -210,9 +274,11 @@ class RandomIndexing(object):
     ## @return     The word vector if the word exists in the vocabulary and None otherwise.
     ##
     def get_word_vector(self, word):
-        # YOUR CODE HERE
-        return None
-
+        try :
+            return self.__cv[word]
+        except KeyError:
+            print("Word not found in vocabulary")
+            return None
 
     ##
     ## @brief      Checks if the vocabulary is written as a text file
@@ -221,7 +287,6 @@ class RandomIndexing(object):
     ##
     def vocab_exists(self):
         return os.path.exists('vocab.txt')
-
 
     ##
     ## @brief      Reads a vocabulary from a text file having one word per line.
@@ -238,23 +303,21 @@ class RandomIndexing(object):
         self.__i2w = list(self.__vocab)
         return vocab_exists
 
-
     ##
-    ## @brief      Writes a vocabulary as a text file containing one word from the vocabulary per row. 
+    ## @brief      Writes a vocabulary as a text file containing one word from the vocabulary per row.
     ##
     def write_vocabulary(self):
         with open('vocab.txt', 'w') as f:
             for w in self.__vocab:
                 f.write('{}\n'.format(w))
 
-
     ##
     ## @brief      Main function call to train word embeddings
-    ## 
+    ##
     ## If vocabulary file exists, it reads the vocabulary from the file (to speed up the program),
     ## otherwise, it builds a vocabulary by reading and cleaning all the Harry Potter books and
     ## storing unique words.
-    ## 
+    ##
     ## After the vocabulary is created/read, the word embeddings are created using Random Indexing.
     ##
     def train(self):
@@ -270,7 +333,7 @@ class RandomIndexing(object):
             start = time.time()
             self.build_vocabulary()
             spinner.succeed(text="Built vocabulary in {}s. Size: {} words".format(round(time.time() - start, 2), ri.vocabulary_size))
-        
+
         spinner.start(text="Creating vectors using random indexing...")
         start = time.time()
         self.create_word_vectors()
@@ -278,9 +341,8 @@ class RandomIndexing(object):
 
         spinner.succeed(text="Execution is finished! Please enter words of interest (separated by space):")
 
-
     ##
-    ## @brief      Trains word embeddings and enters the interactive loop, where you can 
+    ## @brief      Trains word embeddings and enters the interactive loop, where you can
     ##             enter a word and get a list of k nearest neighours.
     ##
     def train_and_persist(self):
@@ -297,23 +359,34 @@ class RandomIndexing(object):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Random Indexing word embeddings')
-    parser.add_argument('-fv', '--force-vocabulary', action='store_true', help='regenerate vocabulary')
-    parser.add_argument('-c', '--cleaning', action='store_true', default=False)
-    parser.add_argument('-co', '--cleaned_output', default='cleaned_example.txt', help='Output file name for the cleaned text')
-    args = parser.parse_args()
+    debugger = True
+    if debugger:
+        random_indexer = RandomIndexing(['example.txt'])
+        random_indexer.build_vocabulary()
+        random_indexer.create_word_vectors()
+        print(random_indexer.get_word_vector('Harry'))
+        # Grab the 5 nearest neighbors for the words "the" and "and"
+        print(random_indexer.find_nearest(["Harry"], k=5, metric='cosine'))
+        
 
-    if args.force_vocabulary:
-        os.remove('vocab.txt')
-
-    if args.cleaning:
-        ri = RandomIndexing(['example.txt'])
-        with open(args.cleaned_output, 'w') as f:
-            for part in ri.text_gen():
-                f.write("{}\n".format(" ".join(part)))
     else:
-        dir_name = "data"
-        filenames = [os.path.join(dir_name, fn) for fn in os.listdir(dir_name)]
+        parser = argparse.ArgumentParser(description='Random Indexing word embeddings')
+        parser.add_argument('-fv', '--force-vocabulary', action='store_true', help='regenerate vocabulary')
+        parser.add_argument('-c', '--cleaning', action='store_true', default=False)
+        parser.add_argument('-co', '--cleaned_output', default='cleaned_example.txt', help='Output file name for the cleaned text')
+        args = parser.parse_args()
 
-        ri = RandomIndexing(filenames)
-        ri.train_and_persist()
+        if args.force_vocabulary:
+            os.remove('vocab.txt')
+
+        if args.cleaning:
+            ri = RandomIndexing(['example.txt'])
+            with open(args.cleaned_output, 'w') as f:
+                for part in ri.text_gen():
+                    f.write("{}\n".format(" ".join(part)))
+        else:
+            dir_name = "data"
+            filenames = [os.path.join(dir_name, fn) for fn in os.listdir(dir_name)]
+
+            ri = RandomIndexing(filenames)
+            ri.train_and_persist()
