@@ -49,7 +49,7 @@ class RandomIndexing(object):
     ## @param      right_window_size  The right window size. Stored in an
     ##                                instance variable self__rws.
     ##
-    def __init__(self, filenames, dimension=2000, non_zero=100, non_zero_values=list([-1, 1]), left_window_size=3, right_window_size=3):
+    def __init__(self, filenames, dimension=10, non_zero=8, non_zero_values=list([-1, 1]), left_window_size=3, right_window_size=3):
         self.__sources = filenames
         self.__vocab = set()
         self.__dim = dimension
@@ -120,6 +120,10 @@ class RandomIndexing(object):
     ##
     def build_vocabulary(self):
         # YOUR CODE HERE
+        for line in self.text_gen():
+            for word in line:
+                if word not in self.__vocab:
+                    self.__vocab.add(word)
         self.write_vocabulary()
 
     ##
@@ -192,15 +196,17 @@ class RandomIndexing(object):
     
     
     def get_right_window(self, current_index, line):
+        # +1 because we want to include the word itself
         right_limit = min(current_index + self.__rws + 1, len(line))
         return line[current_index + 1:right_limit]
+
 
     def get_left_window(self, current_index, line):
         left_limit = max(current_index - self.__lws, 0)
         return line[left_limit:current_index]
 
     def update_word_vector(self, word, context_words):
-        # If the word is not in the context vector, add it to the context vector
+        # If the word is not in the context vector, add it to the context vector.
         if word not in self.__cv:
             self.__cv[word] = np.zeros(self.__dim)
         for ctx_word in context_words:
@@ -215,8 +221,6 @@ class RandomIndexing(object):
             # Update the context vector with the random vector
             self.__cv[word] += self.__rv[ctx_word]
             
- 
-
 
     ##
     ## @brief      Function returning k nearest neighbors with distances for each word in `words`
@@ -245,7 +249,7 @@ class RandomIndexing(object):
     ## @return     A list of list of tuples in the format specified in the function description
     ##
     def find_nearest(self, words, k=5, metric='cosine'):
-        # YOUR CODE HERE - done
+        # Your code here - done
         nearest_words = []
 
         nn = NearestNeighbors(n_neighbors=k, metric=metric).fit(self.__matrix)
@@ -307,7 +311,7 @@ class RandomIndexing(object):
     ## @brief      Writes a vocabulary as a text file containing one word from the vocabulary per row.
     ##
     def write_vocabulary(self):
-        with open('vocab.txt', 'w') as f:
+        with open('vocab.txt', 'w', encoding='utf-8') as f:
             for w in self.__vocab:
                 f.write('{}\n'.format(w))
 
@@ -359,14 +363,14 @@ class RandomIndexing(object):
 
 
 if __name__ == '__main__':
-    debugger = True
+    debugger = False
     if debugger:
         random_indexer = RandomIndexing(['example.txt'])
         random_indexer.build_vocabulary()
         random_indexer.create_word_vectors()
         print(random_indexer.get_word_vector('Harry'))
         # Grab the 5 nearest neighbors for the words "the" and "and"
-        print(random_indexer.find_nearest(["Harry"], k=5, metric='cosine'))
+        print(random_indexer.find_nearest(["Harry", "Gryffindor", "chair", "wand", 'good', 'enter', 'on', 'school'], k=5, metric='cosine'))
         
 
     else:

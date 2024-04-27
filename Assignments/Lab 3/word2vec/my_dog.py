@@ -42,9 +42,14 @@ class Word2Vec(object):
         self.__nbrs = None
         self.__use_corrected = use_corrected
         self.__use_lr_scheduling = use_lr_scheduling
+        
+        self.__V = 0
+        self.__W = None
+        self.__i2w = None
+        self.__w2i = None
+
 
     def init_params(self, W, w2i, i2w):
-        # __w is the word embeddings, __w2i is a dictionary mapping words to their index in the vocabulary
         self.__W = W
         self.__w2i = w2i
         self.__i2w = i2w
@@ -86,39 +91,33 @@ class Word2Vec(object):
                 for line in f:
                     yield self.clean_line(line)
 
-
     def get_context(self, sent, i):
         """
         Returns the context of the word `sent[i]` as a list of word indices
-
+        
         :param      sent:  The sentence
         :type       sent:  list
         :param      i:     Index of the focus word in the sentence
         :type       i:     int
         """
 
-        # Extracting left and right window sizes from class attributes
-        left_window_size = self.__lws
-        right_window_size = self.__rws
+        lws = self.__lws  # Left window size
+        rws = self.__rws  # Right window size
 
         # Retrieving the length of the sentence
         sent_length = len(sent)
 
-        # Constructing a list of context indices within the sentence
-        context_indices_in_sent = list(range(i - left_window_size, i)) + list(
-            range(i + 1, i + right_window_size + 1)
-        )
+        # Calculate the start and end index for the context window
+        start_index = max(0, i - lws)
+        end_index = min(sent_length - 1, i + rws)
 
-        # Ensuring that context indices are within the bounds of the sentence
-        context_indices_in_sent = [
-            item for item in context_indices_in_sent if 0 <= item < sent_length
-        ]
+        # Initialize an empty list to store the context word indices
+        context_indices = []
 
-        # Extracting context words from the sentence based on context indices
-        context_words = [sent[index] for index in context_indices_in_sent]
-
-        # Getting the respective context indices in the entire corpus
-        context_indices = [self.w2i[word] for word in context_words]
+        # Iterate over the context window and append the indices to the list
+        for j in range(start_index, end_index + 1):
+            if j != i:  # Exclude the index of the focus word
+                context_indices.append(j)
 
         return context_indices
 
@@ -132,58 +131,64 @@ class Word2Vec(object):
             a) list of focus words
             b) list of respective context words
         """
-        # REPLACE WITH YOUR CODE
-
-        self.w2i = {}
-        self.i2w = {}
-        self.unigram_count = {}
+        # Step 1) Building maps between words, index and unigram
+        word_to_index = {}
+        index_to_word = {}
+        unigram_count = {}
         index = 0
 
         for line in self.text_gen():
             for word in line:
-                # If the word is not in the dictionary, add it
-                if word not in self.w2i:
-                    self.w2i[word] = index
-                    self.i2w[index] = word
-                    self.unigram_count[word] = 1
+                if word not in word_to_index:
+                    word_to_index[word] = index
+                    index_to_word[index] = word
+                    unigram_count[word] = 1  # Initialize the count of this new word
                     index += 1
                 else:
-                    # Else increment the count of the word
-                    self.unigram_count[word] += 1
+                    unigram_count[word] += 1
 
-        # Calculate the unigram distribution
-        self.unigram_distribution = {}
-        total_words = sum(self.unigram_count.values())
-        for word in self.unigram_count:
-            self.unigram_distribution[word] = self.unigram_count[word] / total_words
+        # Step 2) Calculate the unigram distribution and corrected unigram distribution
 
-        # Calculate the corrected unigram distribution
+        # Uni-gram distribution
+        unigram = {} # Unigram[word] = P(word)
+        total_words = sum(unigram_count.values())
+        for word in unigram_count:
+            unigram[word] = unigram_count[word] / total_words
+
+
+        # Sum of all unigram probabilities
+        sum_unigrams = sum([unigram[w] for w in unigram])
+
+        # Corrected unigram distribution 
         """
         Slide 40 Lecture 6: P_s(w) = P_unigram(w)^0.75 / sum(P_unigram(w)^0.75)
 
         Basically sum the denom
         """
         corrected_unigram = {}
-        denominator = 0
-        for word in self.unigram_distribution:
-            denominator += self.unigram_distribution[word] ** 0.75
-        for word in self.unigram_distribution:
-            corrected_unigram[word] = self.unigram_distribution[word] ** 0.75 / denominator
-
-        # Step 3: Return two two lists: Focus words and context words
+        # EXPONENTIATE THE UNIGRAM DISTRIBUTION BEFORE SUMMING
+        sum_corrected_unigrams = sum([unigram[w] ** 0.75 for w in unigram])
+        for word in unigram:
+            corrected_unigram[word] = (unigram[word] ** 0.75) / sum_corrected_unigrams
+        
+        # Step 3) Return a tuple containing two lists: focus words and context words
         focus_words = []
-        context_indices = []
+        context_words = []
+
+        # Iterate through the text data to generate pairs of focus words and their context words
         for line in self.text_gen():
-            for i, word in enumerate(line):
-                if word not in focus_words:
-                    focus_words.append(word)
-                    context_indices.append(self.get_context(line, i))
-                if word in focus_words:
-                    focus_index = focus_words.index(word)
-                    context_indices[focus_index].extend(self.get_context(line, i))
+            line_length = len(line)
+            for i, focus_word in enumerate(line):
+                # Use get_context function to get context indices
+                context_indices = self.get_context(line, i)
+                # Convert context indices to context words
+                context_words.extend([word_to_index[line[idx]] for idx in context_indices])
+                # Extend focus_words list with the index of the focus word repeated for each context word
+                focus_words.extend([word_to_index[focus_word]] * len(context_indices))
+
+        return focus_words, context_words
 
 
-        return focus_words, context_indices
 
     def sigmoid(self, x):
         """
@@ -206,31 +211,7 @@ class Word2Vec(object):
         #
         # REPLACE WITH YOUR CODE
         #
-        use_corrected = self.__use_corrected
-
-        if use_corrected:
-            unigram = self.corrected_unigram
-        else:
-            unigram = self.unigram_distribution
-        
-        words = list(unigram.keys())
-        probs = list(unigram.values())
-
-        count = 0
-        negative_samples_indices = []
-
-        while count < number:
-            sample_word = np.random.choices(population=words, weights=probs)[0]
-            sample_index = self.w2i[sample_word]
-
-            #Check if the sample is not the focus word, positive word, or previously sampled
-            if sample_index != xb and sample_index != pos and sample_index not in negative_samples_indices:
-                negative_samples_indices.append(sample_index)
-                count += 1
-
-        return negative_samples_indices
-    
-
+        return []
 
     def train(self):
         """
@@ -266,7 +247,7 @@ class Word2Vec(object):
         (all words and distances are just example values):
     
         [[('Harry', 0.0), ('Hagrid', 0.07), ('Snape', 0.08), ('Dumbledore', 0.08), ('Hermione', 0.09)],
-        [('Potter', 0.0), ('quickly', 0.21), ('asked', 0.22), ('lied', 0.23), ('okay', 0.24)]]
+         [('Potter', 0.0), ('quickly', 0.21), ('asked', 0.22), ('lied', 0.23), ('okay', 0.24)]]
         
         The i-th element of the LLT would correspond to k nearest neighbors for the i-th word in the `words`
         list, provided as an argument. Each tuple contains a word and a similarity/distance metric.
@@ -292,8 +273,12 @@ class Word2Vec(object):
                 f.write("{} {}\n".format(self.__V, self.__H))
                 for i, w in enumerate(self.__i2w):
                     f.write(w + " " + " ".join(map(lambda x: "{0:.6f}".format(x), W[i,:])) + "\n")
-        except:
-            print("Error: failing to write model to the file")
+        except FileNotFoundError:
+            print("Error: File 'w2v.txt' not found.")
+        except PermissionError:
+            print("Error: Permission denied to write to file 'w2v.txt'.")
+        except Exception as e:
+            print("Error:", e)
 
     @classmethod
     def load(cls, fname):
