@@ -5,7 +5,9 @@ import string
 from collections import defaultdict
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
+import random
 
+import re
 from tqdm import tqdm
 
 
@@ -57,16 +59,8 @@ class Word2Vec(object):
         # YOUR CODE HERE - Done
 
         # Could not find the python library function to remove
-        punctuation = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
-        digits = "0123456789"
+        return re.sub(r"\d|[^\w\s]", "", line).lower().split()
 
-        cleaned_string = ""
-        cleaned_line = []
-        for char in line:
-            if char not in punctuation and char not in digits:
-                cleaned_string += char
-        cleaned_line = cleaned_string.split()
-        return cleaned_line
 
     def text_gen(self):
         """
@@ -85,7 +79,6 @@ class Word2Vec(object):
             with open(fname, encoding='utf8', errors='ignore') as f:
                 for line in f:
                     yield self.clean_line(line)
-
 
     def get_context(self, sent, i):
         """
@@ -134,22 +127,35 @@ class Word2Vec(object):
         """
         # REPLACE WITH YOUR CODE
 
+        """
+        A function preparing data for a skipgram word2vec model.
+        """
         self.w2i = {}
         self.i2w = {}
         self.unigram_count = {}
-        index = 0
+        self.__V = 0  # Vocabulary size
+        self.__TotalWords = 0  # Total number of words in the corpus
 
+        index = 0
         for line in self.text_gen():
             for word in line:
-                # If the word is not in the dictionary, add it
+                self.__TotalWords += 1
                 if word not in self.w2i:
                     self.w2i[word] = index
                     self.i2w[index] = word
                     self.unigram_count[word] = 1
+                    self.__V += 1  # Increment vocabulary size only for new words
                     index += 1
                 else:
-                    # Else increment the count of the word
                     self.unigram_count[word] += 1
+
+
+        """
+        # Optionally, write the w2i dictionary to a text file
+        with open("w2i.txt", 'w') as f:
+            for key, value in self.w2i.items():
+                f.write('%s:%s\n' % (key, value))
+        """
 
         # Calculate the unigram distribution
         self.unigram_distribution = {}
@@ -163,12 +169,12 @@ class Word2Vec(object):
 
         Basically sum the denom
         """
-        corrected_unigram = {}
+        self.corrected_unigram = {}
         denominator = 0
         for word in self.unigram_distribution:
             denominator += self.unigram_distribution[word] ** 0.75
         for word in self.unigram_distribution:
-            corrected_unigram[word] = self.unigram_distribution[word] ** 0.75 / denominator
+            self.corrected_unigram[word] = self.unigram_distribution[word] ** 0.75 / denominator
 
         # Step 3: Return two two lists: Focus words and context words
         focus_words = []
@@ -181,6 +187,11 @@ class Word2Vec(object):
                 if word in focus_words:
                     focus_index = focus_words.index(word)
                     context_indices[focus_index].extend(self.get_context(line, i))
+
+        # Print w2i as txt
+        with open("w2i.txt", 'w') as f:
+            for key, value in self.w2i.items():
+                f.write('%s:%s\n' % (key, value))
 
 
         return focus_words, context_indices
@@ -212,7 +223,7 @@ class Word2Vec(object):
             unigram = self.corrected_unigram
         else:
             unigram = self.unigram_distribution
-        
+
         words = list(unigram.keys())
         probs = list(unigram.values())
 
@@ -220,17 +231,15 @@ class Word2Vec(object):
         negative_samples_indices = []
 
         while count < number:
-            sample_word = np.random.choices(population=words, weights=probs)[0]
+            sample_word = random.choices(population=words, weights=probs)[0]
             sample_index = self.w2i[sample_word]
 
-            #Check if the sample is not the focus word, positive word, or previously sampled
+            # Check if the sample is not the focus word, positive word, or previously sampled
             if sample_index != xb and sample_index != pos and sample_index not in negative_samples_indices:
                 negative_samples_indices.append(sample_index)
                 count += 1
 
         return negative_samples_indices
-    
-
 
     def train(self):
         """
@@ -241,14 +250,14 @@ class Word2Vec(object):
         print("Dataset contains {} datapoints".format(N))
 
         # REPLACE WITH YOUR RANDOM INITIALIZATION
-        self.__W = np.zeros((100, 50))
-        self.__U = np.zeros((100, 50))
+        self.__W = np.random.rand(self.__V, self.__H)
+        self.__U = np.random.rand(self.__V, self.__H)
 
         for ep in range(self.__epochs):
             for i in tqdm(range(N)):
-                #
+                
                 # YOUR CODE HERE
-                #
+
                 pass
 
     def find_nearest(self, words, metric):
@@ -282,6 +291,7 @@ class Word2Vec(object):
         #
         return []
 
+
     def write_to_file(self):
         """
         Write the model to a file `w2v.txt`
@@ -290,8 +300,12 @@ class Word2Vec(object):
             with open("w2v.txt", 'w') as f:
                 W = self.__W
                 f.write("{} {}\n".format(self.__V, self.__H))
+                i=0
+                print("Unique words: ", len(set(self.__i2w)))
                 for i, w in enumerate(self.__i2w):
+                    print("Iteration: ", i)
                     f.write(w + " " + " ".join(map(lambda x: "{0:.6f}".format(x), W[i,:])) + "\n")
+                    i+=1
         except:
             print("Error: failing to write model to the file")
 
