@@ -369,36 +369,27 @@ class Word2Vec(object):
             negative_samples.extend(self.negative_sampling(self.__nsample, focus_word_ind, pos_ind))
         return negative_samples
 
-    def find_nearest(self, words, metric):
-        """
-        Function returning k nearest neighbors with distances for each word in `words`
-        
-        We suggest using nearest neighbors implementation from scikit-learn 
-        (https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.NearestNeighbors.html). Check
-        carefully their documentation regarding the parameters passed to the algorithm.
-    
-        To describe how the function operates, imagine you want to find 5 nearest neighbors for the words
-        "Harry" and "Potter" using some distance metric `m`. 
-        For that you would need to call `self.find_nearest(["Harry", "Potter"], k=5, metric='m')`.
-        The output of the function would then be the following list of lists of tuples (LLT)
-        (all words and distances are just example values):
-    
-        [[('Harry', 0.0), ('Hagrid', 0.07), ('Snape', 0.08), ('Dumbledore', 0.08), ('Hermione', 0.09)],
-         [('Potter', 0.0), ('quickly', 0.21), ('asked', 0.22), ('lied', 0.23), ('okay', 0.24)]]
-        
-        The i-th element of the LLT would correspond to k nearest neighbors for the i-th word in the `words`
-        list, provided as an argument. Each tuple contains a word and a similarity/distance metric.
-        The tuples are sorted either by descending similarity or by ascending distance.
-        
-        :param      words:   Words for the nearest neighbors to be found
-        :type       words:   list
-        :param      metric:  The similarity/distance metric
-        :type       metric:  string
-        """
-        #
-        # REPLACE WITH YOUR CODE
-        #
-        return []
+    def find_nearest(self, words, k=5, metric='cosine'):
+        # Your code here - done
+        nearest_words = []
+
+        nn = NearestNeighbors(n_neighbors=k, metric=metric).fit(self.__matrix)
+
+        for word in words:
+            context_vector_word = self.get_word_vector(word)
+            if context_vector_word is None:
+                continue
+            distances, indices = nn.kneighbors([context_vector_word])
+
+            clostest_words = []
+            for i in range(len(indices[0])):
+                index = indices[0][i]
+                distance = distances[0][i]
+                the_word = self.__words[index]
+                clostest_words.append((the_word, distance))
+            nearest_words.append(clostest_words)
+
+        return nearest_words
 
     def write_to_file(self):
         """
