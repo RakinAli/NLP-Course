@@ -61,7 +61,6 @@ class Word2Vec(object):
         # Could not find the python library function to remove
         return re.sub(r"\d|[^\w\s]", "", line).lower().split()
 
-
     def text_gen(self):
         """
         A generator function providing one cleaned line at a time
@@ -149,7 +148,6 @@ class Word2Vec(object):
                 else:
                     self.unigram_count[word] += 1
 
-
         """
         # Optionally, write the w2i dictionary to a text file
         with open("w2i.txt", 'w') as f:
@@ -193,7 +191,6 @@ class Word2Vec(object):
             for key, value in self.w2i.items():
                 f.write('%s:%s\n' % (key, value))
 
-
         return focus_words, context_indices
 
     def sigmoid(self, x):
@@ -202,42 +199,56 @@ class Word2Vec(object):
         """
         return 1 / (1 + np.exp(-x))
 
+    import numpy as np
+
+    def create_alias_table(self,probs):
+        n = len(probs)
+        scaled_probs = np.array(probs) * n
+        aliases = np.zeros(n, dtype=np.int32)
+        small = []
+        large = []
+        
+        for i, prob in enumerate(scaled_probs):
+            if prob < 1.0:
+                small.append(i)
+            else:
+                large.append(i)
+        
+        while small and large:
+            small_index = small.pop()
+            large_index = large.pop()
+            
+            aliases[small_index] = large_index
+            scaled_probs[large_index] = (scaled_probs[large_index] - 1) + (scaled_probs[small_index] - 1)
+            
+            if scaled_probs[large_index] < 1.0:
+                small.append(large_index)
+            else:
+                large.append(large_index)
+        
+        return scaled_probs, aliases
+
+
     def negative_sampling(self, number, xb, pos):
         """
-        Sample a `number` of negatives examples with the words in `xb` and `pos` words being
-        in the taboo list, i.e. those should be replaced if sampled.
-        
-        :param      number:     The number of negative examples to be sampled
-        :type       number:     int
-        :param      xb:         The index of the current focus word
-        :type       xb:         int
-        :param      pos:        The index of the current positive example
-        :type       pos:        int
+        Sample a `number` of negatives examples avoiding the words in `xb` and `pos` words.
         """
-        #
-        # REPLACE WITH YOUR CODE
-        #
         use_corrected = self.__use_corrected
+        unigram = self.corrected_unigram if use_corrected else self.unigram_distribution
 
-        if use_corrected:
-            unigram = self.corrected_unigram
-        else:
-            unigram = self.unigram_distribution
-
-        words = list(unigram.keys())
-        probs = list(unigram.values())
-
-        count = 0
         negative_samples_indices = []
+        keys = list(unigram.keys())
+        probabilities = np.array(list(unigram.values()))
+        probabilities /= probabilities.sum()  # Normalize probabilities
 
-        while count < number:
-            sample_word = random.choices(population=words, weights=probs)[0]
-            sample_index = self.w2i[sample_word]
-
-            # Check if the sample is not the focus word, positive word, or previously sampled
-            if sample_index != xb and sample_index != pos and sample_index not in negative_samples_indices:
-                negative_samples_indices.append(sample_index)
-                count += 1
+        while len(negative_samples_indices) < number:
+            candidates = np.random.choice(keys, size=number*2, p=probabilities)
+            for candidate in candidates:
+                candidate_index = self.w2i[candidate]
+                if candidate_index not in negative_samples_indices and candidate_index != xb and candidate_index != pos:
+                    negative_samples_indices.append(candidate_index)
+                if len(negative_samples_indices) == number:
+                    break
 
         return negative_samples_indices
 
@@ -255,10 +266,79 @@ class Word2Vec(object):
 
         for ep in range(self.__epochs):
             for i in tqdm(range(N)):
-                
+
                 # YOUR CODE HERE
 
-                pass
+                # Get the focus word and its index
+                focus_word = x[i]
+                focus_word_index = self.w2i[focus_word]
+                # Get the context words and their indices
+                postive_samples_indices = t[i]
+                postive_samples = [self.i2w[index] for index in postive_samples_indices]
+
+                # Generate negative samples
+                negative_samples_indices = self.generate_neg_samples(focus_word_index, postive_samples_indices)
+
+                negative_samples = [self.i2w[index] for index in negative_samples_indices]
+
+                self.gradient_descent(
+                    focus_word_index,
+                    postive_samples,
+                    negative_samples,
+                    i,
+                    N,
+                    ep,
+                )
+
+    def generate_neg_samples(self, focus_word_idx, pos_sample_dix):
+        neg_samples = []
+        for pos_sample_ind in pos_sample_dix:
+            neg_samples.extend(self.negative_sampling(self.__nsample, focus_word_idx, pos_sample_ind))
+        return neg_samples
+
+    def gradient_descent(self, focus_word_idx, pos_sample_dix, neg_sample_dix, current_words, total_words, total_epochs):
+
+        # Compute gradient with respect to the focus word
+        focus_word_gradient = np.zeros(self.__H)
+        focus_vec = self.__W[focus_word_idx]
+
+        for postive_sample in pos_sample_dix:
+            positive_vec = self.__U[self.w2i[postive_sample]]
+            focus_word_gradient += self.sigmoid(np.dot(focus_vec, positive_vec)) * positive_vec
+
+        for negative_sample in neg_sample_dix:
+            negative_vec = self.__U[self.w2i[negative_sample]]
+            focus_word_gradient += self.sigmoid(np.dot(focus_vec, negative_vec)) * negative_vec
+
+        # Compute gradient with respect to the positive samples
+        positive_grads_dic = {}
+        focus_vec = self.__W[focus_word_idx]
+        for positive_sample in pos_sample_dix:
+            positive_vec = self.__U[self.w2i[positive_sample]]
+            positive_grads_dic[self.w2i[positive_sample]] = focus_vec * (self.sigmoid(np.dot(positive_vec, focus_vec))-1)
+
+        # Compute gradient with respect to the negative samples
+        negative_grads_dic = {}
+        focus_vec = self.__W[focus_word_idx]
+        for negative_sample in neg_sample_dix:
+            negative_vec = self.__U[self.w2i[negative_sample]]
+            negative_grads_dic[self.w2i[negative_sample]] = self.sigmoid(np.dot(focus_vec, negative_vec)) * focus_vec
+
+        # Update the focus word vector
+        self.__W[focus_word_idx] -= self.__lr * focus_word_gradient
+
+        # Update the positive and negative samples vectors
+        for positive_sample in pos_sample_dix:
+            self.__U[self.w2i[positive_sample]] -= self.__lr * positive_grads_dic[self.w2i[positive_sample]]
+
+        for negative_sample in neg_sample_dix:
+            self.__U[self.w2i[negative_sample]] -= self.__lr * negative_grads_dic[self.w2i[negative_sample]]
+
+        # Update the learning rate
+        if self.__lr < self.__init_lr * 0.0001:
+            self.__lr = self.__init_lr * 0.0001
+        else:
+            self.__lr = self.__init_lr * (1 - current_words / (total_words + 1 * total_epochs))
 
     def find_nearest(self, words, metric):
         """
@@ -291,7 +371,6 @@ class Word2Vec(object):
         #
         return []
 
-
     def write_to_file(self):
         """
         Write the model to a file `w2v.txt`
@@ -301,9 +380,7 @@ class Word2Vec(object):
                 W = self.__W
                 f.write("{} {}\n".format(self.__V, self.__H))
                 i=0
-                print("Unique words: ", len(set(self.__i2w)))
                 for i, w in enumerate(self.__i2w):
-                    print("Iteration: ", i)
                     f.write(w + " " + " ".join(map(lambda x: "{0:.6f}".format(x), W[i,:])) + "\n")
                     i+=1
         except:
