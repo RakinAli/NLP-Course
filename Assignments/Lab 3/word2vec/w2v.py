@@ -220,9 +220,9 @@ class Word2Vec(object):
 
         # REPLACE WITH YOUR RANDOM INITIALIZATION
 
-        # Uniform random initialization --> Just picked for fun
-        self.__W = np.random.uniform(-0.5, 0.5, (self.__V, self.__H))
-        self.__U = np.random.uniform(-0.5, 0.5, (self.__V, self.__H)) 
+        # Normalised initialization
+        self.__W = np.random.normal(0, 0.1, (self.__V, self.__H)) # Word embeddings
+        self.__U = np.random.normal(0, 0.1, (self.__V, self.__H)) # Negative samples
 
         for ep in range(self.__epochs):
             for i in tqdm(range(N)):
