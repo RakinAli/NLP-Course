@@ -198,13 +198,13 @@ class Word2Vec(object):
             negative_samples = random.choices(available_words, k=number)
 
         return negative_samples
-    
 
     def generate_neg_sample(self, focus_word_ind, positive_sample_indices):
         negative_samples = []
         for pos_ind in positive_sample_indices:
             negative_samples.extend(self.negative_sampling(self.__nsample, focus_word_ind, pos_ind))
         return negative_samples
+
 
     def train(self):
         x, t = self.skipgram_data()
@@ -224,7 +224,11 @@ class Word2Vec(object):
 
                 # Get negative samples
                 neg_samples = self.generate_neg_sample(focus_word, context_indices)
-                neg_sample_indices = [self.__w2i[word] for word in neg_samples if word in self.__w2i]
+                neg_sample_indices = [
+                    self.__w2i[word] for word in neg_samples if word in self.__w2i
+                ]
+
+                w_update = np.zeros(self.__W[focus_word].shape)
 
                 for pos_word in context_indices:
                     c_pos = self.__U[pos_word]
@@ -233,28 +237,33 @@ class Word2Vec(object):
                     # Update positive sample
                     c_pos_update = self.__lr * (self.sigmoid(np.dot(c_pos, w)) - 1) * w
                     self.__U[pos_word] -= c_pos_update
+                    w_update -= c_pos_update  # Subtract because we're accumulating gradients to subtract
 
-                    # Update for negative samples
-                    for neg_word in neg_sample_indices:
-                        c_neg = self.__U[neg_word]
-                        c_neg_update = self.__lr * self.sigmoid(np.dot(c_neg, w)) * w
-                        self.__U[neg_word] -= c_neg_update
+                # Update for negative samples
+                for neg_word in neg_sample_indices:
+                    c_neg = self.__U[neg_word]
+                    c_neg_update = self.__lr * self.sigmoid(np.dot(c_neg, w)) * w
+                    self.__U[neg_word] -= c_neg_update
+                    w_update += self.__lr * self.sigmoid(np.dot(c_neg, w)) * c_neg
 
-                    # Update word vector w
-                    w_update = c_pos_update
-                    for neg_word in neg_sample_indices:
-                        c_neg = self.__U[neg_word]
-                        w_update += self.__lr * self.sigmoid(np.dot(c_neg, w)) * c_neg
-                    self.__W[focus_word] -= w_update
+                # Apply accumulated updates to the word vector w
+                self.__W[focus_word] -= w_update
+                if words_seen % 10000 == 0:
+                    print("Embedding: ", self.__W[focus_word])
+                    #Check if any values in the array are above 1
+                    if np.any(self.__W[focus_word] > 2):
+                        print("Be worried")
 
                 # Optional: Update learning rate
                 if self.__lr < self.__init_lr * 0.0001:
                     self.__lr = self.__init_lr * 0.0001
-                else:  
-                    self.__lr = self.__init_lr * (1 - words_seen / (self.__total_words * self.__epochs+1))
+                else:
+                    self.__lr = self.__init_lr * (
+                        1 - words_seen / (self.__total_words * self.__epochs + 1)
+                    )
+                words_seen += 1
 
             print("Epoch {}/{} complete".format(ep + 1, self.__epochs))
-
 
     def find_nearest(self, words, k=5, metric='cosine'):
         # Your code here - done
