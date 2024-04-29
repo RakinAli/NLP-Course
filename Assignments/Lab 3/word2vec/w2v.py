@@ -138,12 +138,6 @@ class Word2Vec(object):
         self.create_unigram_dist()
         self.create_corrected_unigram_dist()
 
-        # print w2i as a txt file
-        with open("test_w2i.txt", 'w') as f:
-            for word, index in self.__w2i.items():
-                f.write(f"{word} {index}\n")
-        
-
         return focus_words, context_words 
 
     def create_corrected_unigram_dist(self):
@@ -218,14 +212,19 @@ class Word2Vec(object):
         print("Dataset contains {} datapoints".format(N))
 
         # Normalised initialization
-        self.__W = np.random.normal(0, 0.1, (self.__V, self.__H))  # Word embeddings
-        self.__U = np.random.normal(0, 0.1, (self.__V, self.__H))  # Context embeddings
-        index = 0
+        self.__W = np.random.normal(0, 0.2, (self.__V, self.__H))  # Word embeddings
+        self.__U = np.random.normal(0, 0.2, (self.__V, self.__H))  # Context embeddings
+
+        words_seen = 0
 
         for ep in range(self.__epochs):
             for i in tqdm(range(N)):
                 focus_word = self.__w2i[x[i]]
                 context_indices = t[i]
+
+                # Get negative samples
+                neg_samples = self.generate_neg_sample(focus_word, context_indices)
+                neg_sample_indices = [self.__w2i[word] for word in neg_samples if word in self.__w2i]
 
                 for pos_word in context_indices:
                     c_pos = self.__U[pos_word]
@@ -234,10 +233,6 @@ class Word2Vec(object):
                     # Update positive sample
                     c_pos_update = self.__lr * (self.sigmoid(np.dot(c_pos, w)) - 1) * w
                     self.__U[pos_word] -= c_pos_update
-
-                    # Get negative samples
-                    neg_samples = self.generate_neg_sample(focus_word, context_indices)
-                    neg_sample_indices = [self.__w2i[word] for word in neg_samples if word in self.__w2i]
 
                     # Update for negative samples
                     for neg_word in neg_sample_indices:
@@ -253,12 +248,12 @@ class Word2Vec(object):
                     self.__W[focus_word] -= w_update
 
                 # Optional: Update learning rate
-                if self.__use_lr_scheduling:
-                    self.__lr = self.__init_lr * (1 - ep / self.__epochs)
+                if self.__lr < self.__init_lr * 0.0001:
+                    self.__lr = self.__init_lr * 0.0001
+                else:  
+                    self.__lr = self.__init_lr * (1 - words_seen / (self.__total_words * self.__epochs+1))
 
             print("Epoch {}/{} complete".format(ep + 1, self.__epochs))
-
-
 
 
     def find_nearest(self, words, k=5, metric='cosine'):
