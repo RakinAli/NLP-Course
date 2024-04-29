@@ -224,9 +224,7 @@ class Word2Vec(object):
 
         for ep in range(self.__epochs):
             for i in tqdm(range(N)):
-                index = index + 1
                 focus_word = self.__w2i[x[i]]
-
                 context_indices = t[i]
 
                 for pos_word in context_indices:
@@ -234,7 +232,6 @@ class Word2Vec(object):
                     w = self.__W[focus_word]
 
                     # Update positive sample
-                    
                     c_pos_update = self.__lr * (self.sigmoid(np.dot(c_pos, w)) - 1) * w
                     self.__U[pos_word] -= c_pos_update
 
