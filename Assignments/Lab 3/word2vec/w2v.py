@@ -205,7 +205,6 @@ class Word2Vec(object):
             negative_samples.extend(self.negative_sampling(self.__nsample, focus_word_ind, pos_ind))
         return negative_samples
 
-
     def train(self):
         x, t = self.skipgram_data()
         N = len(x)
@@ -250,7 +249,7 @@ class Word2Vec(object):
                 self.__W[focus_word] -= w_update
                 if words_seen % 10000 == 0:
                     print("Embedding: ", self.__W[focus_word])
-                    #Check if any values in the array are above 1
+                    # Check if any values in the array are above 1
                     if np.any(self.__W[focus_word] > 2):
                         print("Be worried")
 
@@ -265,25 +264,35 @@ class Word2Vec(object):
 
             print("Epoch {}/{} complete".format(ep + 1, self.__epochs))
 
-    def find_nearest(self, words, k=5, metric='cosine'):
-        # Your code here - done
+
+    def find_nearest(self, words, k=5, metric="cosine"):
         nearest_words = []
 
-        nn = NearestNeighbors(n_neighbors=k, metric=metric).fit(self.__matrix)
+        for word in words:  # Iterate through each word in the list
+            if word not in self.__w2i:
+                nearest_words.append((word, ["Word not in vocabulary."]))
+                continue  # Skip words that are not in the vocabulary
 
-        for word in words:
-            context_vector_word = self.get_word_vector(word)
-            if context_vector_word is None:
-                continue
-            distances, indices = nn.kneighbors([context_vector_word])
+            # Ensure that 'self.__W' contains normalized vectors if using cosine similarity
+            if metric == "cosine":
+                normalized_W = self.__W / np.linalg.norm(self.__W, axis=1, keepdims=True)
+                nn = NearestNeighbors(n_neighbors=k + 1, metric=metric).fit(
+                    normalized_W
+                )  # k+1 because the word itself is the closest
+            else:
+                nn = NearestNeighbors(n_neighbors=k, metric=metric).fit(self.__W)
 
-            clostest_words = []
-            for i in range(len(indices[0])):
-                index = indices[0][i]
-                distance = distances[0][i]
-                the_word = self.__words[index]
-                clostest_words.append((the_word, distance))
-            nearest_words.append(clostest_words)
+            # Find the k closest words to the given word
+            word_index = self.__w2i[word]
+            word_vector = [self.__W[word_index]]  # Make it a 2D array to fit with knn input
+            distances, indices = nn.kneighbors(word_vector)
+
+            # Skip the first index if using cosine similarity because it will be the word itself
+            start_index = 1 if metric == "cosine" else 0
+
+            # Append the nearest words to the result list, excluding the word itself if cosine metric is used
+            nearest = [self.__i2w[idx] for idx in indices[0][start_index : start_index + k]]
+            nearest_words.append((word, nearest))
 
         return nearest_words
 
@@ -333,7 +342,7 @@ class Word2Vec(object):
         text = input('> ')
         while text != 'q':
             text = text.split()
-            neighbors = self.find_nearest(text, 'cosine')
+            neighbors = self.find_nearest(text,k=5,metric='cosine')
 
             for w, n in zip(text, neighbors):
                 print("Neighbors for {}: {}".format(w, n))
