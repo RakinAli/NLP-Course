@@ -108,13 +108,10 @@ class NER(object):
             else:
                 return self.func()
 
-
-
     # --------------------------------------------------
 
     def label_number(self, s):
         return 0 if 'O' == s else 1
-
 
 
     def read_and_process_data(self, filename):
@@ -132,7 +129,6 @@ class NER(object):
                     self.process_data(dataset, field[0], field[1])
             return dataset
         return None
-
 
 
     def process_data(self, dataset, token, label):
@@ -166,7 +162,6 @@ class NER(object):
         return None
 
     # ----------------------------------------------------------
-
 
     def __init__(self, training_file, test_file, model_file, word_vectors_file,
                  stochastic_gradient_descent, minibatch_gradient_descent, lowercase_fallback):

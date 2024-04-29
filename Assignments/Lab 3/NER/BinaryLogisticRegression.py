@@ -107,7 +107,6 @@ class BinaryLogisticRegression(object):
         for feature in range(self.FEATURES):
             self.gradient[feature] = x_minibatch.T[feature].dot(loss.T) / self.MINIBATCH_SIZE
 
-
     def compute_gradient(self, datapoint):
         """
         Computes the gradient based on a single datapoint
@@ -151,8 +150,6 @@ class BinaryLogisticRegression(object):
                     f"At termination, Iter: {iteration}, Sum of Square of Gradient: {gradient_norm:.6f}"
                 )
                 break
-        
-
 
     def minibatch_fit(self):
         """
@@ -187,7 +184,6 @@ class BinaryLogisticRegression(object):
                 )
                 break
             
-
     def fit(self):
         """
         Performs Batch Gradient Descent to optimize the theta parameters of the logistic regression model.
