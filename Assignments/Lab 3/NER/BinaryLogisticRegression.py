@@ -18,7 +18,7 @@ class BinaryLogisticRegression(object):
     #  ------------- Hyperparameters ------------------ #
 
     LEARNING_RATE = 0.01  # The learning rate.
-    CONVERGENCE_MARGIN = 0.001  # The convergence criterion.
+    CONVERGENCE_MARGIN = 0.00001  # The convergence criterion.
     MAX_ITERATIONS = 100 # Maximal number of passes through the datapoints in stochastic gradient descent.
     MINIBATCH_SIZE = 1000 # Minibatch size (only for minibatch gradient descent)
 
@@ -57,6 +57,12 @@ class BinaryLogisticRegression(object):
 
             # The current gradient.
             self.gradient = np.zeros(self.FEATURES)
+
+            N = len(self.y)
+            Np = np.sum(self.y==1)
+            Nn = N - Np
+            self.positive_weight = Nn / (N) 
+            self.negative_weight = Np / (N)
 
     # ----------------------------------------------------------------------
 
@@ -100,12 +106,18 @@ class BinaryLogisticRegression(object):
         y_minibatch = self.y[minibatch]
         x_minibatch = self.x[minibatch]
 
-        # Compute the loss for the minibatch
-        loss = self.sigmoid(np.dot(self.theta, x_minibatch.T)) - y_minibatch
+        # Compute predictions
+        predictions = self.sigmoid(np.dot(x_minibatch, self.theta))
+
+        # Calculate weights for each instance in the minibatch
+        weights = np.where(y_minibatch == 1, self.positive_weight, self.negative_weight)
+
+        # Compute the weighted loss for the minibatch
+        weighted_loss = weights * (predictions - y_minibatch)
 
         # Update the gradient for the minibatch
-        for feature in range(self.FEATURES):
-            self.gradient[feature] = x_minibatch.T[feature].dot(loss.T) / self.MINIBATCH_SIZE
+        self.gradient = np.dot(x_minibatch.T, weighted_loss) / len(minibatch)
+
 
     def compute_gradient(self, datapoint):
         """
@@ -150,8 +162,8 @@ class BinaryLogisticRegression(object):
                     f"At termination, Iter: {iteration}, Sum of Square of Gradient: {gradient_norm:.6f}"
                 )
                 break
-
-    def minibatch_fit(self):
+    
+    def minibatch_fit_with_early_stopping(self):
         """
         Performs Mini-batch Gradient Descent.
         """
@@ -160,8 +172,11 @@ class BinaryLogisticRegression(object):
         # YOUR CODE HERE
         gradient_norm = np.inf
         iteration = 0
+        last_gradient_norm = np.inf
+        patience = 10
+        no_improvement = 0
 
-        while gradient_norm > self.CONVERGENCE_MARGIN:
+        while no_improvement < patience:
             iteration += 1
 
             # Pick MINIBATCH_SIZE random datapoints and compute gradient
@@ -183,6 +198,63 @@ class BinaryLogisticRegression(object):
                     f"At termination, Iter: {iteration}, Sum of Square of Gradient: {gradient_norm:.6f}"
                 )
                 break
+
+            # Check for early stopping
+            if gradient_norm < last_gradient_norm:
+                last_gradient_norm = gradient_norm
+                no_improvement = 0
+            else:
+                no_improvement += 1
+
+
+    def minibatch_fit(self):
+        """
+        Performs Mini-batch Gradient Descent.
+        """
+        self.init_plot(self.FEATURES)
+
+        # YOUR CODE HERE
+        gradient_norm = np.inf
+        iteration = 0
+
+        patience = 10
+        no_improvement = 0
+        prev_gradient_norm = np.inf
+
+        while gradient_norm > self.CONVERGENCE_MARGIN:
+            prev_gradient_norm = gradient_norm  
+
+            iteration += 1
+
+            # Pick MINIBATCH_SIZE random datapoints and compute gradient
+            minibatch = random.sample(range(self.DATAPOINTS), self.MINIBATCH_SIZE)
+            self.compute_gradient_minibatch(minibatch)
+
+            for k in range(self.FEATURES):
+                self.theta[k] -= self.LEARNING_RATE * self.gradient[k]
+
+
+            # Plotting the progress
+            gradient_norm = np.sum(np.square(self.gradient))
+
+            if iteration == 1 or iteration % 50 == 0:
+                print(f"Iter: {iteration}, Sum of square of Gradient: {gradient_norm:.6f}")
+                self.update_plot(gradient_norm)
+
+            # Terminating condition
+            if np.sum(np.square(self.gradient)) < self.CONVERGENCE_MARGIN:
+                print(
+                    f"At termination, Iter: {iteration}, Sum of Square of Gradient: {gradient_norm:.6f}"
+                )
+                break
+            
+            if prev_gradient_norm < gradient_norm:
+                no_improvement += 1
+                if no_improvement == patience:
+                    print(f"Early stopping at iteration {iteration}")
+                    break
+            else:
+                no_improvement = 0
             
     def fit(self):
         """

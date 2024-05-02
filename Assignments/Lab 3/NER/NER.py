@@ -88,9 +88,9 @@ class NER(object):
             v = self.w2id.get(NER.PAD_SYMBOL)
             return self.vec_cache[v] if v else [-1] * self.D
         line = self.mo.readline()
-        vec = list(map(float, line.decode('utf8').split()[1:]))
+        vec = list(map(float, line.decode('latin1').split()[1:]))
 
-        if self.current_token_id < NER.MAX_CACHE_SIZE:
+        if self.current_token_id < NER.MAX_CACHE_SIZE:  
             self.w2id[token] = self.current_token_id
             self.vec_cache[self.current_token_id,:] = vec
             self.current_token_id += 1
@@ -210,7 +210,7 @@ class NER(object):
                 if stochastic_gradient_descent:
                     b.stochastic_fit_with_early_stopping()
                 elif minibatch_gradient_descent:
-                    b.minibatch_fit_with_early_stopping()
+                    b.minibatch_fit()
                 else:
                     b.fit()
                 print("Model training took {}s".format(round(time.time() - start_time, 2)))
@@ -266,3 +266,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+ 

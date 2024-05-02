@@ -309,6 +309,7 @@ class Word2Vec(object):
         except:
             print("Error: failing to write model to the file")
 
+
     @classmethod
     def load(cls, fname):
         """
